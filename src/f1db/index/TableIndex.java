@@ -6,10 +6,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 
-/**
- * Индекс таблицы на основе красно-чёрного дерева (TreeMap).
- * Обеспечивает поиск за O(log N) как по точному совпадению (=), так и по диапазонам.
- */
 public class TableIndex implements Serializable {
     private static final long serialVersionUID = 1L;
 
@@ -26,23 +22,12 @@ public class TableIndex implements Serializable {
     public String getIndexName() { return indexName; }
     public String getColumnName() { return columnName; }
 
-    /**
-     * Добавляет запись в индекс.
-     *
-     * @param columnValue значение индексируемого поля
-     * @param primaryKey  первичный ключ строки
-     */
     public void put(Comparable<?> columnValue, Comparable<?> primaryKey) {
         if (columnValue == null) return;
         tree.computeIfAbsent(columnValue, k -> new LinkedHashSet<>()).add(primaryKey);
     }
 
-    /**
-     * Удаляет запись из индекса.
-     *
-     * @param columnValue значение индексируемого поля
-     * @param primaryKey  первичный ключ строки
-     */
+
     public void remove(Comparable<?> columnValue, Comparable<?> primaryKey) {
         if (columnValue == null) return;
         Set<Comparable<?>> pks = tree.get(columnValue);
@@ -54,13 +39,6 @@ public class TableIndex implements Serializable {
         }
     }
 
-    /**
-     * Выполняет поиск первичных ключей по условию с использованием дерева индекса.
-     *
-     * @param operator оператор сравнения (=, !=, >, <, >=, <=)
-     * @param target   целевое значение для сравнения
-     * @return множество найденных первичных ключей
-     */
     @SuppressWarnings("rawtypes")
     public Set<Comparable<?>> search(String operator, Comparable<?> target) {
         Set<Comparable<?>> result = new LinkedHashSet<>();
