@@ -527,4 +527,186 @@ public class SqlEngine {
         while (sb.length() < n) sb.append(' ');
         return sb.toString();
     }
+    /**
+     * Выполняет SQL-запрос и возвращает структурированный объект QueryResult для GUI.
+     *
+     * @param rawSql строка SQL-запроса
+     * @return результат с табличными данными (для SELECT) или статусом выполнения
+     */
+    public QueryResult executeForGui(String rawSql) {
+        String sql = rawSql.trim();
+        if (sql.endsWith(";")) {
+            sql = sql.substring(0, sql.length() - 1).trim();
+        }
+        if (sql.isEmpty()) {
+            return QueryResult.ofMessage("Пустой запрос.");
+        }
+
+        if (sql.toUpperCase().startsWith("SELECT")) {
+            return handleSelectStructured(sql);
+        } else {
+            String message = execute(rawSql);
+            return QueryResult.ofMessage(message);
+        }
+    }
+
+    private QueryResult handleSelectStructured(String sql) {
+        Pattern p = Pattern.compile("(?i)^SELECT\\s+(.+?)\\s+FROM\\s+(\\w+)(?:\\s+WHERE\\s+(.+))?$");
+        Matcher m = p.matcher(sql);
+        if (!m.matches()) {
+            throw new IllegalArgumentException("Синтаксис: SELECT * | col1, col2 FROM table [WHERE col op val]");
+        }
+
+        String selectPart = m.group(1).trim();
+        String tableName = m.group(2).toLowerCase();
+        String wherePart = m.group(3);
+
+        Table table = db.getTable(tableName);
+        List<String> displayColumns = new ArrayList<>();
+        if (selectPart.equals("*")) {
+            displayColumns.addAll(table.getColumns().keySet());
+        } else {
+            for (String c : selectPart.split(",")) {
+                String colName = c.trim().toLowerCase();
+                if (!table.getColumns().containsKey(colName)) {
+                    throw new IllegalArgumentException("Столбец '" + colName + "' не найден в таблице '" + tableName + "'");
+                }
+                displayColumns.add(colName);
+            }
+        }
+
+        long startNano = System.nanoTime();
+        List<Row> matchedRows;
+        String executionPlan;
+
+        if (wherePart == null || wherePart.trim().isEmpty()) {
+            matchedRows = new ArrayList<>();
+            for (Row r : table) {
+                matchedRows.add(r);
+            }
+            executionPlan = "FULL SCAN (без WHERE)";
+        } else {
+            Condition cond = parseCondition(table, wherePart);
+            TableIndex idx = table.getIndexesByColumn().get(cond.getColumnName());
+            if (idx != null) {
+                Set<Comparable<?>> pks = idx.search(cond.getOperator(), cond.getTargetValue());
+                matchedRows = new ArrayList<>(pks.size());
+                for (Comparable<?> pk : pks) {
+                    Row r = table.getRowsByPk().get(pk);
+                    if (r != null) matchedRows.add(r);
+                }
+                executionPlan = "INDEX SCAN (" + idx.getIndexName() + ")";
+            } else if (cond.getColumnName().equals(table.getPrimaryKeyColumn()) && cond.getOperator().equals("=")) {
+                matchedRows = new ArrayList<>();
+                Row r = table.getRowsByPk().get(cond.getTargetValue());
+                if (r != null) matchedRows.add(r);
+                executionPlan = "PRIMARY KEY LOOKUP";
+            } else {
+                matchedRows = new ArrayList<>();
+                for (Row r : table) {
+                    if (cond.matches(r)) {
+                        matchedRows.add(r);
+                    }
+                }
+                executionPlan = "FULL TABLE SCAN (последовательный обход)";
+            }
+        }
+        double elapsedMs = (System.nanoTime() - startNano) / 1_000_000.0;
+        String status = String.format(Locale.US,
+                "Таблица: %s | Найдено строк: %d | План: %s | Время: %.3f мс",
+                tableName, matchedRows.size(), executionPlan, elapsedMs);
+
+        return QueryResult.ofSelect(displayColumns, matchedRows, status);
+    }
+    /**
+     * Выполняет SQL-запрос и возвращает структурированный объект QueryResult для GUI.
+     *
+     * @param rawSql строка SQL-запроса
+     * @return результат с табличными данными (для SELECT) или статусом выполнения
+     */
+    public QueryResult executeForGui(String rawSql) {
+        String sql = rawSql.trim();
+        if (sql.endsWith(";")) {
+            sql = sql.substring(0, sql.length() - 1).trim();
+        }
+        if (sql.isEmpty()) {
+            return QueryResult.ofMessage("Пустой запрос.");
+        }
+
+        if (sql.toUpperCase().startsWith("SELECT")) {
+            return handleSelectStructured(sql);
+        } else {
+            String message = execute(rawSql);
+            return QueryResult.ofMessage(message);
+        }
+    }
+
+    private QueryResult handleSelectStructured(String sql) {
+        Pattern p = Pattern.compile("(?i)^SELECT\\s+(.+?)\\s+FROM\\s+(\\w+)(?:\\s+WHERE\\s+(.+))?$");
+        Matcher m = p.matcher(sql);
+        if (!m.matches()) {
+            throw new IllegalArgumentException("Синтаксис: SELECT * | col1, col2 FROM table [WHERE col op val]");
+        }
+
+        String selectPart = m.group(1).trim();
+        String tableName = m.group(2).toLowerCase();
+        String wherePart = m.group(3);
+
+        Table table = db.getTable(tableName);
+        List<String> displayColumns = new ArrayList<>();
+        if (selectPart.equals("*")) {
+            displayColumns.addAll(table.getColumns().keySet());
+        } else {
+            for (String c : selectPart.split(",")) {
+                String colName = c.trim().toLowerCase();
+                if (!table.getColumns().containsKey(colName)) {
+                    throw new IllegalArgumentException("Столбец '" + colName + "' не найден в таблице '" + tableName + "'");
+                }
+                displayColumns.add(colName);
+            }
+        }
+
+        long startNano = System.nanoTime();
+        List<Row> matchedRows;
+        String executionPlan;
+
+        if (wherePart == null || wherePart.trim().isEmpty()) {
+            matchedRows = new ArrayList<>();
+            for (Row r : table) {
+                matchedRows.add(r);
+            }
+            executionPlan = "FULL SCAN (без WHERE)";
+        } else {
+            Condition cond = parseCondition(table, wherePart);
+            TableIndex idx = table.getIndexesByColumn().get(cond.getColumnName());
+            if (idx != null) {
+                Set<Comparable<?>> pks = idx.search(cond.getOperator(), cond.getTargetValue());
+                matchedRows = new ArrayList<>(pks.size());
+                for (Comparable<?> pk : pks) {
+                    Row r = table.getRowsByPk().get(pk);
+                    if (r != null) matchedRows.add(r);
+                }
+                executionPlan = "INDEX SCAN (" + idx.getIndexName() + ")";
+            } else if (cond.getColumnName().equals(table.getPrimaryKeyColumn()) && cond.getOperator().equals("=")) {
+                matchedRows = new ArrayList<>();
+                Row r = table.getRowsByPk().get(cond.getTargetValue());
+                if (r != null) matchedRows.add(r);
+                executionPlan = "PRIMARY KEY LOOKUP";
+            } else {
+                matchedRows = new ArrayList<>();
+                for (Row r : table) {
+                    if (cond.matches(r)) {
+                        matchedRows.add(r);
+                    }
+                }
+                executionPlan = "FULL TABLE SCAN (последовательный обход)";
+            }
+        }
+        double elapsedMs = (System.nanoTime() - startNano) / 1_000_000.0;
+        String status = String.format(Locale.US,
+                "Таблица: %s | Найдено строк: %d | План: %s | Время: %.3f мс",
+                tableName, matchedRows.size(), executionPlan, elapsedMs);
+
+        return QueryResult.ofSelect(displayColumns, matchedRows, status);
+    }
 }
