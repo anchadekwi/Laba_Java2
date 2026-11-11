@@ -15,9 +15,6 @@ import java.util.stream.Collectors;
 
 public class F1DatabaseApp {
 
-    /**
-     * Заполняет БД стартовыми таблицами Формулы-1 (teams и drivers), если БД создаётся впервые.
-     */
     private static void initializeDefaultF1Data(SqlEngine engine) {
         System.out.println("Инициализация стартовой базы данных 'Formula 1 Championship'...");
         engine.execute("CREATE TABLE teams (id INT PK, name STRING, budget FLOAT, founded DATE, active BOOL);");
