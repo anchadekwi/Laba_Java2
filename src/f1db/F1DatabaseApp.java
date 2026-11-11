@@ -8,12 +8,6 @@ import f1db.ui.MainFrame;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 
-/**
- * Главный класс запуска СУБД Formula 1 с графическим интерфейсом Swing.
- *
- * @author Anna Fedorova
- * @version 1.1
- */
 public class F1DatabaseApp {
 
     private static void initializeDefaultF1Data(SqlEngine engine) {

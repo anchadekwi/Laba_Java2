@@ -527,12 +527,7 @@ public class SqlEngine {
         while (sb.length() < n) sb.append(' ');
         return sb.toString();
     }
-    /**
-     * Выполняет SQL-запрос и возвращает структурированный объект QueryResult для GUI.
-     *
-     * @param rawSql строка SQL-запроса
-     * @return результат с табличными данными (для SELECT) или статусом выполнения
-     */
+
     public QueryResult executeForGui(String rawSql) {
         String sql = rawSql.trim();
         if (sql.endsWith(";")) {
