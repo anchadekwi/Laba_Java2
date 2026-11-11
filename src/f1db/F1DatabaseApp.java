@@ -12,13 +12,7 @@ import java.util.Random;
 import java.util.Scanner;
 import java.util.stream.Collectors;
 
-/**
- * Главный класс упрощённой СУБД "Formula 1 DBMS".
- * Запускает интерактивную консоль, инициализирует демо-данные и проводит бенчмарк.
- *
- * @author Anna Fedorova
- * @version 1.0
- */
+
 public class F1DatabaseApp {
 
     /**
@@ -48,10 +42,7 @@ public class F1DatabaseApp {
         engine.execute("CREATE INDEX idx_drivers_points ON drivers (points);");
     }
 
-    /**
-     * Запускает встроенный тест производительности: сравнивает время SELECT без индекса и с индексом
-     * на выборке из 50 000 записей.
-     */
+
     private static void runBenchmark(SqlEngine engine) {
         System.out.println("\n=== ЗАПУСК ТЕСТИРОВАНИЯ ПРОИЗВОДИТЕЛЬНОСТИ (50 000 ЗАПИСЕЙ) ===");
         engine.setAutoSave(false);
@@ -150,11 +141,7 @@ public class F1DatabaseApp {
         }
     }
 
-    /**
-     * Точка входа в программу.
-     *
-     * @param args аргументы командной строки
-     */
+
     public static void main(String[] args) {
         StorageRepository repository = new StorageRepository("f1_database.db");
         Database db = repository.load();
@@ -169,10 +156,8 @@ public class F1DatabaseApp {
             System.out.println("База данных успешно загружена с диска (файл f1_database.db).");
         }
 
-        System.out.println("==========================================================");
         System.out.println("   Добро пожаловать в СУБД Formula 1 (Java DBMS v1.0)     ");
         System.out.println("   Введите SQL-запрос или команду (HELP, TABLES, BENCHMARK, EXIT)");
-        System.out.println("==========================================================");
         printSchema(db);
 
         try (Scanner scanner = new Scanner(System.in)) {

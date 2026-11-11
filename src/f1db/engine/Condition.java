@@ -2,9 +2,7 @@ package f1db.engine;
 
 import f1db.model.Row;
 
-/**
- * Представляет разобранное условие секции WHERE.
- */
+
 public class Condition {
     private final String columnName;
     private final String operator;
@@ -20,12 +18,7 @@ public class Condition {
     public String getOperator() { return operator; }
     public Comparable<?> getTargetValue() { return targetValue; }
 
-    /**
-     * Проверяет, удовлетворяет ли переданная строка условию WHERE.
-     *
-     * @param row проверяемая строка таблицы
-     * @return true, если условие выполняется
-     */
+
     @SuppressWarnings({"unchecked", "rawtypes"})
     public boolean matches(Row row) {
         Comparable rowVal = row.getValue(columnName);

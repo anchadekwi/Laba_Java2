@@ -18,9 +18,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * Ядро обработки и парсинга SQL-подобных запросов (паттерн Interpreter / Command).
- */
+
 public class SqlEngine {
     private final Database db;
     private final StorageRepository repository;
@@ -39,21 +37,12 @@ public class SqlEngine {
         this.autoSave = autoSave;
     }
 
-    /**
-     * Сохраняет состояние БД на диск, если включён режим автосохранения.
-     */
     public void persistIfNeeded() {
         if (autoSave && repository != null) {
             repository.save(db);
         }
     }
 
-    /**
-     * Выполняет SQL-команду и возвращает текстовый результат (или таблицу).
-     *
-     * @param rawSql строка SQL-запроса
-     * @return строковый результат выполнения для вывода в консоль
-     */
     public String execute(String rawSql) {
         String sql = rawSql.trim();
         if (sql.endsWith(";")) {
