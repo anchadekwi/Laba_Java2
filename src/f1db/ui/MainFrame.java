@@ -329,13 +329,13 @@ public class MainFrame extends JFrame {
         JPanel crudButtonsPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
         crudButtonsPanel.setBackground(BG_PANEL);
 
-        JButton addRowBtn = createButton("+ Добавить строку", BTN_GREEN_BG, Color.WHITE);
+        JButton addRowBtn = createButton("Добавить строку", BTN_GREEN_BG, Color.WHITE);
         addRowBtn.addActionListener(e -> showAddRowDialog());
 
-        JButton editCellBtn = createButton("✎ Изменить ячейку", BTN_NEUTRAL_BG, TEXT_DARK);
+        JButton editCellBtn = createButton("Изменить ячейку", BTN_NEUTRAL_BG, TEXT_DARK);
         editCellBtn.addActionListener(e -> editSelectedTableCell());
 
-        JButton deleteRowBtn = createButton("✕ Удалить строку", BTN_DANGER_BG, TEXT_DANGER);
+        JButton deleteRowBtn = createButton("Удалить строку", BTN_DANGER_BG, TEXT_DANGER);
         deleteRowBtn.addActionListener(e -> deleteSelectedTableRow());
 
         crudButtonsPanel.add(addRowBtn);
