@@ -185,7 +185,7 @@ public class MainFrame extends JFrame {
         JScrollPane listScroll = new JScrollPane(tableList);
         listScroll.setBorder(BorderFactory.createLineBorder(BORDER_COLOR));
 
-        JButton dropTableBtn = createButton("✕ Удалить таблицу", BTN_DANGER_BG, TEXT_DANGER);
+        JButton dropTableBtn = createButton("Удалить таблицу", BTN_DANGER_BG, TEXT_DANGER);
         dropTableBtn.addActionListener(e -> dropSelectedTable());
 
         listContainer.add(tablesTitle, BorderLayout.NORTH);
@@ -211,7 +211,7 @@ public class MainFrame extends JFrame {
         JScrollPane schemaScroll = new JScrollPane(schemaInfoArea);
         schemaScroll.setBorder(BorderFactory.createLineBorder(BORDER_COLOR));
 
-        JButton addIndexBtn = createButton("+ Создать индекс по столбцу", BTN_NEUTRAL_BG, TEXT_DARK);
+        JButton addIndexBtn = createButton("Создать индекс по столбцу", BTN_NEUTRAL_BG, TEXT_DARK);
         addIndexBtn.addActionListener(e -> showCreateIndexDialog());
 
         schemaContainer.add(schemaTitle, BorderLayout.NORTH);
@@ -254,14 +254,14 @@ public class MainFrame extends JFrame {
         JPanel toolbar = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         toolbar.setBackground(BG_PANEL);
 
-        JButton runBtn = createButton("▶ Выполнить запрос (Ctrl+Enter)", BTN_PRIMARY_BG, Color.WHITE);
+        JButton runBtn = createButton("Выполнить запрос", BTN_PRIMARY_BG, Color.WHITE);
         runBtn.addActionListener(e -> executeSqlQuery(sqlEditor.getText(), true));
 
         JButton clearBtn = createButton("Очистить", BTN_NEUTRAL_BG, TEXT_DARK);
         clearBtn.addActionListener(e -> sqlEditor.setText(""));
 
         String[] presets = {
-                "— Готовые шаблоны SQL-запросов —",
+                "Готовые шаблоны SQL-запросов",
                 "SELECT * FROM drivers;",
                 "SELECT * FROM teams;",
                 "SELECT name, points FROM drivers WHERE points >= 300;",
@@ -414,15 +414,15 @@ public class MainFrame extends JFrame {
 
         // Контекстное меню и двойной клик для UPDATE
         JPopupMenu popupMenu = new JPopupMenu();
-        JMenuItem addMenuItem = new JMenuItem("+ Добавить новую строку...");
+        JMenuItem addMenuItem = new JMenuItem("Добавить новую строку");
         addMenuItem.setFont(FONT_UI);
         addMenuItem.addActionListener(e -> showAddRowDialog());
 
-        JMenuItem editMenuItem = new JMenuItem("✎ Изменить значение ячейки (двойной клик)...");
+        JMenuItem editMenuItem = new JMenuItem("Изменить значение ячейки");
         editMenuItem.setFont(FONT_UI);
         editMenuItem.addActionListener(e -> editSelectedTableCell());
 
-        JMenuItem deleteMenuItem = new JMenuItem("✕ Удалить выбранную строку (Delete)");
+        JMenuItem deleteMenuItem = new JMenuItem("Удалить выбранную строку");
         deleteMenuItem.setFont(FONT_UI);
         deleteMenuItem.setForeground(TEXT_DANGER);
         deleteMenuItem.addActionListener(e -> deleteSelectedTableRow());
@@ -624,7 +624,7 @@ public class MainFrame extends JFrame {
         int viewCol = resultTable.getSelectedColumn();
         if (viewRow < 0 || viewCol < 0) {
             statusLabel.setForeground(STATUS_ERR);
-            statusLabel.setText(" ✖ Кликните по ячейке, которую хотите изменить");
+            statusLabel.setText(" Кликните по ячейке, которую хотите изменить");
             return;
         }
 
