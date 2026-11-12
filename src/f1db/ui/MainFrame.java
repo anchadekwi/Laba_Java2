@@ -46,6 +46,7 @@ import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
+import java.awt.GridLayout;
 import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
@@ -58,7 +59,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-
 
 public class MainFrame extends JFrame {
     private static final Color BG_MAIN = new Color(241, 245, 249);
@@ -96,7 +96,6 @@ public class MainFrame extends JFrame {
     private final JTable resultTable = new JTable(resultTableModel);
     private final JLabel tableHeaderLabel = new JLabel("ДАННЫЕ ТАБЛИЦЫ");
 
-    // Компоненты быстрого фильтра WHERE
     private final DefaultComboBoxModel<String> filterColModel = new DefaultComboBoxModel<>();
     private final JComboBox<String> filterColCombo = new JComboBox<>(filterColModel);
     private final JComboBox<String> filterOpCombo = new JComboBox<>(new String[]{"=", "!=", ">", "<", ">=", "<="});
@@ -106,7 +105,7 @@ public class MainFrame extends JFrame {
     private final JTextArea logArea = new JTextArea(4, 60);
 
     public MainFrame(SqlEngine engine, StorageRepository repository) {
-        super("Formula 1 DBMS — Графическая консоль управления БД");
+        super("Formula 1 DBMS - Графическая консоль управления БД");
         this.engine = engine;
         this.repository = repository;
 
@@ -121,8 +120,8 @@ public class MainFrame extends JFrame {
 
     private void configureWindow() {
         setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
-        setSize(1180, 750);
-        setMinimumSize(new Dimension(960, 620));
+        setSize(1200, 760);
+        setMinimumSize(new Dimension(980, 620));
         setLocationRelativeTo(null);
         getContentPane().setBackground(BG_MAIN);
 
@@ -143,7 +142,7 @@ public class MainFrame extends JFrame {
         JPanel mainWorkspace = buildWorkspacePanel();
 
         JSplitPane horizontalSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, sidebarPanel, mainWorkspace);
-        horizontalSplit.setDividerLocation(285);
+        horizontalSplit.setDividerLocation(300);
         horizontalSplit.setDividerSize(5);
         horizontalSplit.setBorder(null);
 
@@ -185,12 +184,21 @@ public class MainFrame extends JFrame {
         JScrollPane listScroll = new JScrollPane(tableList);
         listScroll.setBorder(BorderFactory.createLineBorder(BORDER_COLOR));
 
+        JPanel tableButtonsPanel = new JPanel(new GridLayout(2, 1, 0, 6));
+        tableButtonsPanel.setBackground(BG_PANEL);
+
+        JButton createTableBtn = createButton("Создать таблицу", BTN_GREEN_BG, Color.WHITE);
+        createTableBtn.addActionListener(e -> showCreateTableDialog());
+
         JButton dropTableBtn = createButton("Удалить таблицу", BTN_DANGER_BG, TEXT_DANGER);
         dropTableBtn.addActionListener(e -> dropSelectedTable());
 
+        tableButtonsPanel.add(createTableBtn);
+        tableButtonsPanel.add(dropTableBtn);
+
         listContainer.add(tablesTitle, BorderLayout.NORTH);
         listContainer.add(listScroll, BorderLayout.CENTER);
-        listContainer.add(dropTableBtn, BorderLayout.SOUTH);
+        listContainer.add(tableButtonsPanel, BorderLayout.SOUTH);
 
         JPanel schemaContainer = new JPanel(new BorderLayout(0, 6));
         schemaContainer.setBackground(BG_PANEL);
@@ -219,7 +227,7 @@ public class MainFrame extends JFrame {
         schemaContainer.add(addIndexBtn, BorderLayout.SOUTH);
 
         JSplitPane sidebarSplit = new JSplitPane(JSplitPane.VERTICAL_SPLIT, listContainer, schemaContainer);
-        sidebarSplit.setDividerLocation(230);
+        sidebarSplit.setDividerLocation(260);
         sidebarSplit.setDividerSize(5);
         sidebarSplit.setBorder(null);
 
@@ -261,7 +269,7 @@ public class MainFrame extends JFrame {
         clearBtn.addActionListener(e -> sqlEditor.setText(""));
 
         String[] presets = {
-                "Готовые шаблоны SQL-запросов",
+                "Выберите шаблон SQL-запроса",
                 "SELECT * FROM drivers;",
                 "SELECT * FROM teams;",
                 "SELECT name, points FROM drivers WHERE points >= 300;",
@@ -412,7 +420,6 @@ public class MainFrame extends JFrame {
             }
         });
 
-        // Контекстное меню и двойной клик для UPDATE
         JPopupMenu popupMenu = new JPopupMenu();
         JMenuItem addMenuItem = new JMenuItem("Добавить новую строку");
         addMenuItem.setFont(FONT_UI);
@@ -516,6 +523,165 @@ public class MainFrame extends JFrame {
         return btn;
     }
 
+    private void showCreateTableDialog() {
+        JPanel dialogPanel = new JPanel(new BorderLayout(8, 10));
+        dialogPanel.setPreferredSize(new Dimension(620, 380));
+        dialogPanel.setBorder(new EmptyBorder(6, 6, 6, 6));
+
+        JPanel topNamePanel = new JPanel(new BorderLayout(8, 0));
+        JLabel nameLabel = new JLabel("Имя новой таблицы:");
+        nameLabel.setFont(FONT_BOLD);
+        JTextField tableNameField = new JTextField("races");
+        tableNameField.setFont(FONT_MONO);
+        topNamePanel.add(nameLabel, BorderLayout.WEST);
+        topNamePanel.add(tableNameField, BorderLayout.CENTER);
+
+        DefaultTableModel colsModel = new DefaultTableModel(
+                new Object[]{"Имя столбца", "Тип данных", "Первичный ключ (PK)", "Внешний ключ (FK)"}, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        colsModel.addRow(new Object[]{"id", "INT", "PK", "Нет"});
+
+        JTable colsTable = new JTable(colsModel);
+        colsTable.setFont(FONT_UI);
+        colsTable.setRowHeight(24);
+        colsTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        JScrollPane colsScroll = new JScrollPane(colsTable);
+
+        // Панель добавления нового столбца
+        JPanel addColPanel = new JPanel(new GridBagLayout());
+        addColPanel.setBorder(BorderFactory.createTitledBorder("Параметры нового столбца"));
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(4, 4, 4, 4);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+
+        JTextField colNameField = new JTextField(10);
+        colNameField.setFont(FONT_MONO);
+
+        JComboBox<String> colTypeCombo = new JComboBox<>(new String[]{"INT", "FLOAT", "STRING", "DATE", "BOOL"});
+        colTypeCombo.setFont(FONT_UI);
+
+        JCheckBox pkCheck = new JCheckBox("Первичный ключ (PK)");
+        pkCheck.setFont(FONT_UI);
+
+        List<String> fkOptions = new ArrayList<>();
+        fkOptions.add("Нет");
+        for (Table existingTable : engine.getDatabase().getTables().values()) {
+            fkOptions.add(existingTable.getName() + "." + existingTable.getPrimaryKeyColumn());
+        }
+        JComboBox<String> fkCombo = new JComboBox<>(fkOptions.toArray(new String[0]));
+        fkCombo.setFont(FONT_UI);
+
+        gbc.gridx = 0; gbc.gridy = 0;
+        addColPanel.add(new JLabel("Имя:"), gbc);
+        gbc.gridx = 1;
+        addColPanel.add(colNameField, gbc);
+
+        gbc.gridx = 2;
+        addColPanel.add(new JLabel("Тип:"), gbc);
+        gbc.gridx = 3;
+        addColPanel.add(colTypeCombo, gbc);
+
+        gbc.gridx = 0; gbc.gridy = 1;
+        addColPanel.add(pkCheck, gbc);
+
+        gbc.gridx = 1;
+        addColPanel.add(new JLabel("Связь FK:"), gbc);
+        gbc.gridx = 2; gbc.gridwidth = 2;
+        addColPanel.add(fkCombo, gbc);
+
+        JPanel colActionButtons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
+        JButton addColBtn = createButton("Добавить столбец в список", BTN_PRIMARY_BG, Color.WHITE);
+        JButton removeColBtn = createButton("Убрать выбранный столбец", BTN_NEUTRAL_BG, TEXT_DARK);
+
+        addColBtn.addActionListener(e -> {
+            String cName = colNameField.getText().trim().toLowerCase();
+            if (cName.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Введите имя столбца.", "Внимание", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            for (int i = 0; i < colsModel.getRowCount(); i++) {
+                if (colsModel.getValueAt(i, 0).toString().equalsIgnoreCase(cName)) {
+                    JOptionPane.showMessageDialog(this, "Столбец с таким именем уже добавлен.", "Внимание", JOptionPane.WARNING_MESSAGE);
+                    return;
+                }
+            }
+            String cType = (String) colTypeCombo.getSelectedItem();
+            String pkFlag = pkCheck.isSelected() ? "PK" : "";
+            String fkTarget = (String) fkCombo.getSelectedItem();
+
+            if (pkCheck.isSelected()) {
+                for (int i = 0; i < colsModel.getRowCount(); i++) {
+                    colsModel.setValueAt("", i, 2);
+                }
+            }
+
+            colsModel.addRow(new Object[]{cName, cType, pkFlag, fkTarget});
+            colNameField.setText("");
+            pkCheck.setSelected(false);
+            fkCombo.setSelectedIndex(0);
+        });
+
+        removeColBtn.addActionListener(e -> {
+            int sel = colsTable.getSelectedRow();
+            if (sel >= 0) {
+                colsModel.removeRow(sel);
+            }
+        });
+
+        colActionButtons.add(addColBtn);
+        colActionButtons.add(removeColBtn);
+
+        gbc.gridx = 0; gbc.gridy = 2; gbc.gridwidth = 4;
+        addColPanel.add(colActionButtons, gbc);
+
+        dialogPanel.add(topNamePanel, BorderLayout.NORTH);
+        dialogPanel.add(colsScroll, BorderLayout.CENTER);
+        dialogPanel.add(addColPanel, BorderLayout.SOUTH);
+
+        int result = JOptionPane.showConfirmDialog(
+                this,
+                dialogPanel,
+                "Конструктор новой таблицы (CREATE TABLE)",
+                JOptionPane.OK_CANCEL_OPTION,
+                JOptionPane.PLAIN_MESSAGE
+        );
+
+        if (result != JOptionPane.OK_OPTION) return;
+
+        String tableName = tableNameField.getText().trim().toLowerCase();
+        if (tableName.isEmpty() || colsModel.getRowCount() == 0) {
+            statusLabel.setForeground(STATUS_ERR);
+            statusLabel.setText(" Ошибка: укажите имя таблицы и хотя бы один столбец");
+            return;
+        }
+
+        List<String> colDefinitions = new ArrayList<>();
+        for (int i = 0; i < colsModel.getRowCount(); i++) {
+            String cName = colsModel.getValueAt(i, 0).toString();
+            String cType = colsModel.getValueAt(i, 1).toString();
+            String cPk = colsModel.getValueAt(i, 2).toString();
+            String cFk = colsModel.getValueAt(i, 3).toString();
+
+            StringBuilder def = new StringBuilder(cName).append(" ").append(cType);
+            if ("PK".equalsIgnoreCase(cPk)) {
+                def.append(" PK");
+            }
+            if (cFk != null && !cFk.equals("Нет") && !cFk.isEmpty()) {
+                def.append(" FK ").append(cFk);
+            }
+            colDefinitions.add(def.toString());
+        }
+
+        String createSql = "CREATE TABLE " + tableName + " (" + String.join(", ", colDefinitions) + ");";
+        sqlEditor.setText(createSql);
+        executeSqlQuery(createSql, true);
+        tableList.setSelectedValue(tableName, true);
+    }
+
     private void applyQuickFilter() {
         String tableName = tableList.getSelectedValue();
         if (tableName == null || !engine.getDatabase().getTables().containsKey(tableName)) return;
@@ -526,7 +692,7 @@ public class MainFrame extends JFrame {
 
         if (colName == null || rawVal.isEmpty()) {
             statusLabel.setForeground(STATUS_ERR);
-            statusLabel.setText(" ✖ Введите значение для фильтрации");
+            statusLabel.setText(" Ошибка: введите значение для фильтрации");
             return;
         }
 
@@ -565,7 +731,7 @@ public class MainFrame extends JFrame {
             StringBuilder labelText = new StringBuilder(col.getName()).append(" (").append(col.getType()).append(")");
             if (col.isPrimaryKey()) labelText.append(" [PK]");
             if (col.getForeignKeyTable() != null) {
-                labelText.append(" [FK -> ").append(col.getForeignKeyTable()).append("]");
+                labelText.append(" [FK ").append(col.getForeignKeyTable()).append("]");
             }
 
             JLabel lbl = new JLabel(labelText.toString() + ":");
@@ -594,7 +760,7 @@ public class MainFrame extends JFrame {
         }
 
         int choice = JOptionPane.showConfirmDialog(this, formPanel,
-                "Добавить запись в '" + tableName + "'",
+                "Добавить запись в таблицу " + tableName,
                 JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
 
         if (choice != JOptionPane.OK_OPTION) return;
@@ -624,7 +790,7 @@ public class MainFrame extends JFrame {
         int viewCol = resultTable.getSelectedColumn();
         if (viewRow < 0 || viewCol < 0) {
             statusLabel.setForeground(STATUS_ERR);
-            statusLabel.setText(" Кликните по ячейке, которую хотите изменить");
+            statusLabel.setText(" Ошибка: кликните по ячейке, которую хотите изменить");
             return;
         }
 
@@ -638,7 +804,7 @@ public class MainFrame extends JFrame {
         int pkColIndex = findColumnIndex(pkColName);
         if (pkColIndex == -1) {
             JOptionPane.showMessageDialog(this,
-                    "Для редактирования в выборке должен присутствовать столбец PK '" + pkColName + "'.",
+                    "Для редактирования в выборке должен присутствовать столбец PK " + pkColName + ".",
                     "Нет первичного ключа", JOptionPane.WARNING_MESSAGE);
             return;
         }
@@ -650,7 +816,7 @@ public class MainFrame extends JFrame {
 
         String newRawValue = (String) JOptionPane.showInputDialog(
                 this,
-                "Новое значение для столбца '" + targetColName + "' (" + targetColMeta.getType() + "):",
+                "Новое значение для столбца " + targetColName + " (" + targetColMeta.getType() + "):",
                 "Обновление записи (UPDATE)",
                 JOptionPane.PLAIN_MESSAGE,
                 null,
@@ -676,7 +842,7 @@ public class MainFrame extends JFrame {
         int viewRow = resultTable.getSelectedRow();
         if (viewRow < 0) {
             statusLabel.setForeground(STATUS_ERR);
-            statusLabel.setText(" ✖ Выделите строку в таблице для удаления");
+            statusLabel.setText(" Ошибка: выделите строку в таблице для удаления");
             return;
         }
 
@@ -688,7 +854,7 @@ public class MainFrame extends JFrame {
         int pkColIndex = findColumnIndex(pkColName);
         if (pkColIndex == -1) {
             JOptionPane.showMessageDialog(this,
-                    "В текущей выборке отсутствует столбец первичного ключа '" + pkColName + "'.",
+                    "В текущей выборке отсутствует столбец первичного ключа " + pkColName + ".",
                     "Нет первичного ключа", JOptionPane.WARNING_MESSAGE);
             return;
         }
@@ -710,7 +876,7 @@ public class MainFrame extends JFrame {
 
         String chosenCol = (String) JOptionPane.showInputDialog(
                 this,
-                "Выберите столбец таблицы '" + tableName + "' для построения TreeMap-индекса:",
+                "Выберите столбец таблицы " + tableName + " для построения TreeMap-индекса:",
                 "Создание индекса (CREATE INDEX)",
                 JOptionPane.PLAIN_MESSAGE,
                 null,
@@ -732,7 +898,7 @@ public class MainFrame extends JFrame {
 
         int confirm = JOptionPane.showConfirmDialog(
                 this,
-                "Удалить таблицу '" + tableName + "' со всеми её данными?",
+                "Удалить таблицу " + tableName + " со всеми её данными?",
                 "Подтверждение DROP TABLE",
                 JOptionPane.YES_NO_OPTION,
                 JOptionPane.WARNING_MESSAGE
@@ -812,12 +978,12 @@ public class MainFrame extends JFrame {
             }
 
             statusLabel.setForeground(STATUS_OK);
-            statusLabel.setText(" ✔ " + result.getStatusMessage());
-            appendLog("[OK] " + trimmed + "  -->  " + result.getStatusMessage());
+            statusLabel.setText(" Успешно: " + result.getStatusMessage());
+            appendLog("[УСПЕХ] " + trimmed + " | Результат: " + result.getStatusMessage());
 
         } catch (Exception ex) {
             statusLabel.setForeground(STATUS_ERR);
-            statusLabel.setText(" ✖ Ошибка: " + ex.getMessage());
+            statusLabel.setText(" Ошибка: " + ex.getMessage());
             appendLog("[ОШИБКА] " + ex.getMessage());
         }
     }
@@ -881,10 +1047,10 @@ public class MainFrame extends JFrame {
         sb.append("Записей: ").append(t.getRowsByPk().size()).append("\n\n");
         sb.append("Столбцы:\n");
         for (Column c : t.getColumns().values()) {
-            sb.append(" • ").append(c.getName()).append(" (").append(c.getType()).append(")");
+            sb.append(" - ").append(c.getName()).append(" (").append(c.getType()).append(")");
             if (c.isPrimaryKey()) sb.append(" [PK]");
             if (c.getForeignKeyTable() != null) {
-                sb.append(" [FK->").append(c.getForeignKeyTable())
+                sb.append(" [FK ").append(c.getForeignKeyTable())
                         .append(".").append(c.getForeignKeyColumn()).append("]");
             }
             sb.append("\n");
@@ -892,11 +1058,11 @@ public class MainFrame extends JFrame {
 
         sb.append("\nИндексы (TreeMap):\n");
         if (t.getIndexesByColumn().isEmpty()) {
-            sb.append(" (нет индексов)\n");
+            sb.append(" нет индексов\n");
         } else {
             for (TableIndex idx : t.getIndexesByColumn().values()) {
-                sb.append(" • ").append(idx.getIndexName())
-                        .append(" по (").append(idx.getColumnName()).append(")\n");
+                sb.append(" - ").append(idx.getIndexName())
+                        .append(" по столбцу ").append(idx.getColumnName()).append("\n");
             }
         }
         schemaInfoArea.setText(sb.toString());
