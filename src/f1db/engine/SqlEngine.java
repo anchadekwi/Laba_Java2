@@ -14,10 +14,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
 
 public class SqlEngine {
     private final Database db;
@@ -37,13 +37,11 @@ public class SqlEngine {
         this.autoSave = autoSave;
     }
 
-
     public void persistIfNeeded() {
         if (autoSave && repository != null) {
             repository.save(db);
         }
     }
-
 
     public QueryResult executeForGui(String rawSql) {
         String sql = rawSql.trim();
@@ -61,76 +59,6 @@ public class SqlEngine {
             return QueryResult.ofMessage(message);
         }
     }
-
-    private QueryResult handleSelectStructured(String sql) {
-        Pattern p = Pattern.compile("(?i)^SELECT\\s+(.+?)\\s+FROM\\s+(\\w+)(?:\\s+WHERE\\s+(.+))?$");
-        Matcher m = p.matcher(sql);
-        if (!m.matches()) {
-            throw new IllegalArgumentException("Синтаксис: SELECT * | col1, col2 FROM table [WHERE col op val]");
-        }
-
-        String selectPart = m.group(1).trim();
-        String tableName = m.group(2).toLowerCase();
-        String wherePart = m.group(3);
-
-        Table table = db.getTable(tableName);
-        List<String> displayColumns = new ArrayList<>();
-        if (selectPart.equals("*")) {
-            displayColumns.addAll(table.getColumns().keySet());
-        } else {
-            for (String c : selectPart.split(",")) {
-                String colName = c.trim().toLowerCase();
-                if (!table.getColumns().containsKey(colName)) {
-                    throw new IllegalArgumentException("Столбец '" + colName + "' не найден в таблице '" + tableName + "'");
-                }
-                displayColumns.add(colName);
-            }
-        }
-
-        long startNano = System.nanoTime();
-        List<Row> matchedRows;
-        String executionPlan;
-
-        if (wherePart == null || wherePart.trim().isEmpty()) {
-            matchedRows = new ArrayList<>();
-            for (Row r : table) {
-                matchedRows.add(r);
-            }
-            executionPlan = "FULL SCAN (без WHERE)";
-        } else {
-            Condition cond = parseCondition(table, wherePart);
-            TableIndex idx = table.getIndexesByColumn().get(cond.getColumnName());
-            if (idx != null) {
-                Set<Comparable<?>> pks = idx.search(cond.getOperator(), cond.getTargetValue());
-                matchedRows = new ArrayList<>(pks.size());
-                for (Comparable<?> pk : pks) {
-                    Row r = table.getRowsByPk().get(pk);
-                    if (r != null) matchedRows.add(r);
-                }
-                executionPlan = "INDEX SCAN (" + idx.getIndexName() + ")";
-            } else if (cond.getColumnName().equals(table.getPrimaryKeyColumn()) && cond.getOperator().equals("=")) {
-                matchedRows = new ArrayList<>();
-                Row r = table.getRowsByPk().get(cond.getTargetValue());
-                if (r != null) matchedRows.add(r);
-                executionPlan = "PRIMARY KEY LOOKUP";
-            } else {
-                matchedRows = new ArrayList<>();
-                for (Row r : table) {
-                    if (cond.matches(r)) {
-                        matchedRows.add(r);
-                    }
-                }
-                executionPlan = "FULL TABLE SCAN (последовательный обход)";
-            }
-        }
-        double elapsedMs = (System.nanoTime() - startNano) / 1_000_000.0;
-        String status = String.format(Locale.US,
-                "Таблица: %s | Найдено строк: %d | План: %s | Время: %.3f мс",
-                tableName, matchedRows.size(), executionPlan, elapsedMs);
-
-        return QueryResult.ofSelect(displayColumns, matchedRows, status);
-    }
-
 
     public String execute(String rawSql) {
         String sql = rawSql.trim();
@@ -160,7 +88,7 @@ public class SqlEngine {
     }
 
     private String handleCreateTable(String sql) {
-        Pattern p = Pattern.compile("(?i)^CREATE\\s+TABLE\\s+(\\w+)\\s*\\((.+)\\)$");
+        Pattern p = Pattern.compile("(?is)^CREATE\\s+TABLE\\s+(\\w+)\\s*\\((.+)\\)$");
         Matcher m = p.matcher(sql);
         if (!m.matches()) {
             throw new IllegalArgumentException("Синтаксис: CREATE TABLE name (col1 TYPE [PK], col2 TYPE [FK refTable.refCol], ...)");
@@ -178,7 +106,13 @@ public class SqlEngine {
                 throw new IllegalArgumentException("Некорректное описание столбца: " + def);
             }
             String colName = tokens[0].toLowerCase();
-            DataType type = DataType.valueOf(tokens[1].toUpperCase());
+            DataType type;
+            try {
+                type = DataType.valueOf(tokens[1].toUpperCase());
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("Неизвестный тип данных '" + tokens[1]
+                        + "'. Доступны: INT, FLOAT, STRING, DATE, BOOL");
+            }
             boolean isPk = false;
             String fkTable = null;
             String fkCol = null;
@@ -193,6 +127,18 @@ public class SqlEngine {
                     }
                     fkTable = ref[0].toLowerCase();
                     fkCol = ref[1].toLowerCase();
+
+                    Table parentTable = db.getTable(fkTable);
+                    if (!parentTable.getPrimaryKeyColumn().equals(fkCol)) {
+                        throw new IllegalArgumentException("Внешний ключ должен ссылаться на первичный ключ '"
+                                + parentTable.getPrimaryKeyColumn() + "' таблицы '" + fkTable + "'");
+                    }
+                    Column parentPkCol = parentTable.getColumns().get(fkCol);
+                    if (parentPkCol.getType() != type) {
+                        throw new IllegalArgumentException("Несовпадение типов FK: столбец '" + colName
+                                + "' имеет тип " + type + ", а '" + fkTable + "." + fkCol
+                                + "' имеет тип " + parentPkCol.getType());
+                    }
                 }
             }
             cols.add(new Column(colName, type, isPk, fkTable, fkCol));
@@ -205,7 +151,7 @@ public class SqlEngine {
     }
 
     private String handleDropTable(String sql) {
-        Pattern p = Pattern.compile("(?i)^DROP\\s+TABLE\\s+(\\w+)$");
+        Pattern p = Pattern.compile("(?is)^DROP\\s+TABLE\\s+(\\w+)$");
         Matcher m = p.matcher(sql);
         if (!m.matches()) {
             throw new IllegalArgumentException("Синтаксис: DROP TABLE table_name");
@@ -229,7 +175,7 @@ public class SqlEngine {
     }
 
     private String handleCreateIndex(String sql) {
-        Pattern p = Pattern.compile("(?i)^CREATE\\s+INDEX\\s+(\\w+)\\s+ON\\s+(\\w+)\\s*\\(\\s*(\\w+)\\s*\\)$");
+        Pattern p = Pattern.compile("(?is)^CREATE\\s+INDEX\\s+(\\w+)\\s+ON\\s+(\\w+)\\s*\\(\\s*(\\w+)\\s*\\)$");
         Matcher m = p.matcher(sql);
         if (!m.matches()) {
             throw new IllegalArgumentException("Синтаксис: CREATE INDEX index_name ON table_name (column_name)");
@@ -245,7 +191,7 @@ public class SqlEngine {
     }
 
     private String handleInsert(String sql) {
-        Pattern p = Pattern.compile("(?i)^INSERT\\s+INTO\\s+(\\w+)\\s*(?:\\(([^)]+)\\))?\\s*VALUES\\s*(.+)$");
+        Pattern p = Pattern.compile("(?is)^INSERT\\s+INTO\\s+(\\w+)\\s*(?:\\(([^)]+)\\))?\\s*VALUES\\s*(.+)$");
         Matcher m = p.matcher(sql);
         if (!m.matches()) {
             throw new IllegalArgumentException("Некорректный синтаксис INSERT INTO");
@@ -323,8 +269,8 @@ public class SqlEngine {
         return "Вставлено записей в '" + tableName + "': " + rowsToInsert.size();
     }
 
-    private String handleSelect(String sql) {
-        Pattern p = Pattern.compile("(?i)^SELECT\\s+(.+?)\\s+FROM\\s+(\\w+)(?:\\s+WHERE\\s+(.+))?$");
+    private QueryResult handleSelectStructured(String sql) {
+        Pattern p = Pattern.compile("(?is)^SELECT\\s+(.+?)\\s+FROM\\s+(\\w+)(?:\\s+WHERE\\s+(.+))?$");
         Matcher m = p.matcher(sql);
         if (!m.matches()) {
             throw new IllegalArgumentException("Синтаксис: SELECT * | col1, col2 FROM table [WHERE col op val]");
@@ -361,15 +307,16 @@ public class SqlEngine {
         } else {
             Condition cond = parseCondition(table, wherePart);
             TableIndex idx = table.getIndexesByColumn().get(cond.getColumnName());
-            if (idx != null) {
+            if (idx != null && cond.getTargetValue() != null) {
                 Set<Comparable<?>> pks = idx.search(cond.getOperator(), cond.getTargetValue());
                 matchedRows = new ArrayList<>(pks.size());
                 for (Comparable<?> pk : pks) {
                     Row r = table.getRowsByPk().get(pk);
                     if (r != null) matchedRows.add(r);
                 }
-                executionPlan = "INDEX SCAN (индекс '" + idx.getIndexName() + "' по столбцу '" + cond.getColumnName() + "')";
-            } else if (cond.getColumnName().equals(table.getPrimaryKeyColumn()) && cond.getOperator().equals("=")) {
+                executionPlan = "INDEX SCAN (" + idx.getIndexName() + ")";
+            } else if (cond.getColumnName().equals(table.getPrimaryKeyColumn())
+                    && cond.getOperator().equals("=") && cond.getTargetValue() != null) {
                 matchedRows = new ArrayList<>();
                 Row r = table.getRowsByPk().get(cond.getTargetValue());
                 if (r != null) matchedRows.add(r);
@@ -385,14 +332,20 @@ public class SqlEngine {
             }
         }
         double elapsedMs = (System.nanoTime() - startNano) / 1_000_000.0;
+        String status = String.format(Locale.US,
+                "Таблица: %s | Найдено строк: %d | План: %s | Время: %.3f мс",
+                tableName, matchedRows.size(), executionPlan, elapsedMs);
 
-        return formatAsciiTable(displayColumns, matchedRows)
-                + String.format(Locale.US, "\nНайдено строк: %d | План: %s | Время: %.3f мс",
-                matchedRows.size(), executionPlan, elapsedMs);
+        return QueryResult.ofSelect(displayColumns, matchedRows, status);
+    }
+
+    private String handleSelect(String sql) {
+        QueryResult res = handleSelectStructured(sql);
+        return formatAsciiTable(res.getColumns(), res.getRows()) + "\n" + res.getStatusMessage();
     }
 
     private String handleUpdate(String sql) {
-        Pattern p = Pattern.compile("(?i)^UPDATE\\s+(\\w+)\\s+SET\\s+(.+?)(?:\\s+WHERE\\s+(.+))?$");
+        Pattern p = Pattern.compile("(?is)^UPDATE\\s+(\\w+)\\s+SET\\s+(.+?)(?:\\s+WHERE\\s+(.+))?$");
         Matcher m = p.matcher(sql);
         if (!m.matches()) {
             throw new IllegalArgumentException("Синтаксис: UPDATE table SET col = val [WHERE col op val]");
@@ -419,6 +372,9 @@ public class SqlEngine {
                 throw new IllegalArgumentException("Столбец '" + colName + "' не существует в '" + tableName + "'");
             }
             Comparable<?> parsedVal = colMeta.getType().parseValue(kv[1]);
+            if (colName.equals(table.getPrimaryKeyColumn()) && parsedVal == null) {
+                throw new IllegalArgumentException("Первичный ключ '" + colName + "' не может быть NULL");
+            }
             if (parsedVal != null && colMeta.getForeignKeyTable() != null) {
                 Table refTable = db.getTable(colMeta.getForeignKeyTable());
                 if (!refTable.getRowsByPk().containsKey(parsedVal)) {
@@ -436,6 +392,15 @@ public class SqlEngine {
             }
         }
 
+        if (newValues.containsKey(table.getPrimaryKeyColumn())) {
+            Comparable<?> newPkVal = newValues.get(table.getPrimaryKeyColumn());
+            for (Comparable<?> oldPk : targetPks) {
+                if (!Objects.equals(oldPk, newPkVal)) {
+                    ensureNoChildReferences(tableName, oldPk);
+                }
+            }
+        }
+
         for (Comparable<?> pk : targetPks) {
             for (Map.Entry<String, Comparable<?>> entry : newValues.entrySet()) {
                 table.updateRowValue(pk, entry.getKey(), entry.getValue());
@@ -447,7 +412,7 @@ public class SqlEngine {
     }
 
     private String handleDelete(String sql) {
-        Pattern p = Pattern.compile("(?i)^DELETE\\s+FROM\\s+(\\w+)(?:\\s+WHERE\\s+(.+))?$");
+        Pattern p = Pattern.compile("(?is)^DELETE\\s+FROM\\s+(\\w+)(?:\\s+WHERE\\s+(.+))?$");
         Matcher m = p.matcher(sql);
         if (!m.matches()) {
             throw new IllegalArgumentException("Синтаксис: DELETE FROM table [WHERE col op val]");
@@ -467,20 +432,8 @@ public class SqlEngine {
             }
         }
 
-        for (Table other : db.getTables().values()) {
-            if (other.getName().equals(tableName)) continue;
-            for (Column col : other.getColumns().values()) {
-                if (tableName.equals(col.getForeignKeyTable())) {
-                    for (Row childRow : other) {
-                        Comparable<?> fkVal = childRow.getValue(col.getName());
-                        if (fkVal != null && pksToDelete.contains(fkVal)) {
-                            throw new IllegalArgumentException("Нарушение ссылочной целостности (FK)! "
-                                    + "Нельзя удалить запись с ID = " + fkVal + " из '" + tableName
-                                    + "', так как на неё ссылается таблица '" + other.getName() + "'");
-                        }
-                    }
-                }
-            }
+        for (Comparable<?> pk : pksToDelete) {
+            ensureNoChildReferences(tableName, pk);
         }
 
         for (Comparable<?> pk : pksToDelete) {
@@ -490,8 +443,26 @@ public class SqlEngine {
         return "Удалено записей из '" + tableName + "': " + pksToDelete.size();
     }
 
+    private void ensureNoChildReferences(String parentTableName, Comparable<?> parentPkVal) {
+        for (Table other : db.getTables().values()) {
+            if (other.getName().equals(parentTableName)) continue;
+            for (Column col : other.getColumns().values()) {
+                if (parentTableName.equals(col.getForeignKeyTable())) {
+                    for (Row childRow : other) {
+                        Comparable<?> fkVal = childRow.getValue(col.getName());
+                        if (Objects.equals(fkVal, parentPkVal)) {
+                            throw new IllegalArgumentException("Нарушение ссылочной целостности (FK)! "
+                                    + "Запись с ID = " + parentPkVal + " в таблице '" + parentTableName
+                                    + "' используется в таблице '" + other.getName() + "'");
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private Condition parseCondition(Table table, String whereClause) {
-        Pattern p = Pattern.compile("^\\s*(\\w+)\\s*(>=|<=|!=|=|>|<)\\s*(.+?)\\s*$");
+        Pattern p = Pattern.compile("(?s)^\\s*(\\w+)\\s*(>=|<=|!=|=|>|<)\\s*(.+?)\\s*$");
         Matcher m = p.matcher(whereClause);
         if (!m.matches()) {
             throw new IllegalArgumentException("Некорректное условие WHERE: " + whereClause);

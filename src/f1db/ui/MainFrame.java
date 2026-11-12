@@ -92,7 +92,19 @@ public class MainFrame extends JFrame {
         public boolean isCellEditable(int row, int column) {
             return false;
         }
+
+        @Override
+        public Class<?> getColumnClass(int columnIndex) {
+            for (int r = 0; r < getRowCount(); r++) {
+                Object val = getValueAt(r, columnIndex);
+                if (val instanceof Comparable<?> && !"NULL".equals(val)) {
+                    return val.getClass();
+                }
+            }
+            return Object.class;
+        }
     };
+
     private final JTable resultTable = new JTable(resultTableModel);
     private final JLabel tableHeaderLabel = new JLabel("ДАННЫЕ ТАБЛИЦЫ");
 
